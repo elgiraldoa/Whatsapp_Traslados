@@ -1,0 +1,15 @@
+services:
+  bot:
+    build: .
+    container_name: traslados
+    restart: unless-stopped
+    env_file:
+      - .env
+    volumes:
+      - ./reminders.json:/app/reminders.json
+      - ./groups.json:/app/groups.json
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
