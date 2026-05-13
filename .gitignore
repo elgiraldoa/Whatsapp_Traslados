@@ -1,6 +1,2 @@
 node_modules/
 package-lock.json
-.env
-auth_info_baileys/
-*.json
-!package.json
