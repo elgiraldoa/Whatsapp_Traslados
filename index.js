@@ -19,36 +19,53 @@ const STEPS = [
 const sessions = new Map();
 
 async function startBot() {
-    console.log('🚀 Iniciando Baileys... por favor espera.');
-    const { state, saveCreds } = await useMultiFileAuthState('auth_info_baileys');
+    // Definimos sock fuera para poder referenciarlo si es necesario
+    let sock;
 
-    const sock = makeWASocket({
-        printQRInTerminal: true,
-        auth: state,
-        logger: pino({ level: 'silent' }),
-        browser: ['Material Bot', 'Chrome', '1.0.0']
-    });
+    async function connectToWhatsApp() {
+        const { state, saveCreds } = await useMultiFileAuthState('auth_info_baileys');
 
-    sock.ev.on('creds.update', saveCreds);
+        sock = makeWASocket({
+            printQRInTerminal: true,
+            auth: state,
+            logger: pino({ level: 'silent' }),
+            browser: ['Material Bot', 'Chrome', '1.0.0']
+        });
 
-    sock.ev.on('connection.update', (update) => {
-        const { connection, lastDisconnect, qr } = update;
+        sock.ev.on('creds.update', saveCreds);
 
-        if (qr) {
-            console.log('📲 Escanea este QR con WhatsApp:\n');
-            const qrcode = require('qrcode-terminal');
-            qrcode.generate(qr, { small: true });
-        }
+        sock.ev.on('connection.update', (update) => {
+            const { connection, lastDisconnect, qr } = update;
 
-        if (connection === 'close') {
-            const shouldReconnect = (lastDisconnect.error instanceof Boom)?.output?.statusCode !== DisconnectReason.loggedOut;
-            console.log('Conexión cerrada. Reconectando...', shouldReconnect);
-            if (shouldReconnect) startBot();
-        } else if (connection === 'open') {
-            console.log('✅ Bot conectado correctamente (Baileys)');
-        }
-    });
+            if (qr) {
+                console.log('📲 Escanea este QR con WhatsApp:\n');
+                const qrcode = require('qrcode-terminal');
+                qrcode.generate(qr, { small: true });
+            }
 
+            if (connection === 'close') {
+                const reason = new Boom(lastDisconnect?.error)?.output?.statusCode;
+                console.log('❌ Conexión cerrada. Razón:', reason);
+
+                const shouldReconnect = reason !== DisconnectReason.loggedOut;
+
+                if (shouldReconnect) {
+                    console.log('🔄 Reconectando en 5 segundos...');
+                    setTimeout(connectToWhatsApp, 5000); // Pequeña espera para evitar bucles infinitos agresivos
+                }
+            } else if (connection === 'open') {
+                console.log('✅ Bot conectado correctamente (Baileys)');
+            }
+        });
+
+        // Mover el resto de los listeners aquí (messages.upsert)
+        setupMessageListener(sock);
+    }
+
+    await connectToWhatsApp();
+}
+
+function setupMessageListener(sock) {
     sock.ev.on('messages.upsert', async ({ messages, type }) => {
         const msg = messages[0];
         if (!msg.message || msg.key.fromMe) return;
