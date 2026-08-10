@@ -1,5 +1,5 @@
 require('dotenv').config();
-const { default: makeWASocket, useMultiFileAuthState, DisconnectReason, makeInMemoryStore, jidDecode } = require('@whiskeysockets/baileys');
+const { default: makeWASocket, useMultiFileAuthState, DisconnectReason, makeInMemoryStore, jidDecode, Browsers, fetchLatestWaWebVersion } = require('@whiskeysockets/baileys');
 const { Boom } = require('@hapi/boom');
 const pino = require('pino');
 const axios = require('axios');
@@ -24,8 +24,11 @@ async function startBot() {
 
     async function connectToWhatsApp() {
         const { state, saveCreds } = await useMultiFileAuthState('auth_info_baileys');
+        const { version, isLatest } = await fetchLatestWaWebVersion().catch(() => ({ version: [2, 3000, 1044839451], isLatest: false }));
+        console.log(`📡 Usando WhatsApp Web v${version.join('.')}, isLatest: ${isLatest}`);
 
         sock = makeWASocket({
+            version,
             printQRInTerminal: true,
             auth: state,
             logger: pino({ level: 'silent' }),
